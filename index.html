@@ -47,11 +47,59 @@
     const video = document.getElementById("video");
     const statusDiv = document.getElementById("status");
 
-    let pc = new RTCPeerConnection({ 
-      iceServers: [{ urls: "stun:stun.l.google.com:19302" }] 
-    });
-
+    let pc = null;
     let role = null;
+    
+    // Función para crear nueva conexión
+    function createPeerConnection() {
+      if (pc) {
+        pc.close();
+      }
+      
+      pc = new RTCPeerConnection({ 
+        iceServers: [{ urls: "stun:stun.l.google.com:19302" }] 
+      });
+      
+      setupPeerConnectionHandlers();
+    }
+    
+    function setupPeerConnectionHandlers() {
+      // Manejo de ICE candidates
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          const candidate = {
+            candidate: event.candidate.candidate,
+            sdpMid: event.candidate.sdpMid,
+            sdpMLineIndex: event.candidate.sdpMLineIndex
+          };
+          db.ref(`${roomId}/candidates/${role}`).push(candidate);
+          updateStatus(`Enviando candidate (${role})`);
+        }
+      };
+      
+      // Recibir stream (para viewer)
+      pc.ontrack = (event) => {
+        if (role === "viewer") {
+          video.srcObject = event.streams[0];
+          updateStatus("Conexión establecida! Viendo pantalla compartida...");
+        }
+      };
+
+      // Manejar estados de conexión
+      pc.onconnectionstatechange = () => {
+        updateStatus("Estado de conexión: " + pc.connectionState);
+        if (pc.connectionState === 'failed') {
+          updateStatus("Conexión falló. Reiniciando...");
+          setTimeout(() => {
+            if (role === "sender") {
+              startShare();
+            } else if (role === "viewer") {
+              startViewer();
+            }
+          }, 2000);
+        }
+      };
+    }
 
     // Función específica para iOS con workarounds
     async function startIOSScreenShare() {
@@ -99,7 +147,11 @@
     async function startCamera() {
       try {
         role = "sender";
+        createPeerConnection();
         updateStatus("Iniciando cámara...");
+        
+        // Limpiar datos anteriores
+        await db.ref(roomId).remove();
         
         const stream = await navigator.mediaDevices.getUserMedia({ 
           video: { 
@@ -113,19 +165,25 @@
         
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
-        db.ref(`${roomId}/offer`).set({
+        
+        await db.ref(`${roomId}/offer`).set({
           type: offer.type,
           sdp: offer.sdp
         });
         
         updateStatus("Oferta creada. Esperando respuesta...");
 
-        // Escuchar respuesta
-        db.ref(`${roomId}/answer`).on("value", async snap => {
-          if (snap.exists()) {
-            const answer = new RTCSessionDescription(snap.val());
-            await pc.setRemoteDescription(answer);
-            updateStatus("Conexión establecida! Compartiendo cámara...");
+        // Escuchar respuesta UNA SOLA VEZ
+        db.ref(`${roomId}/answer`).once("value", async snap => {
+          if (snap.exists() && pc.signalingState === "have-local-offer") {
+            try {
+              const answer = new RTCSessionDescription(snap.val());
+              await pc.setRemoteDescription(answer);
+              updateStatus("Conexión establecida! Compartiendo cámara...");
+            } catch (error) {
+              console.error("Error setting remote description:", error);
+              updateStatus("Error en la conexión: " + error.message);
+            }
           }
         });
 
@@ -150,17 +208,17 @@
 
     // Escuchar candidates del viewer
     db.ref(`${roomId}/candidates/viewer`).on("child_added", snap => {
-      if (role === "sender") {
-        pc.addIceCandidate(new RTCIceCandidate(snap.val()));
-        updateStatus("Candidate recibido del viewer");
+      if (role === "sender" && pc && pc.remoteDescription) {
+        pc.addIceCandidate(new RTCIceCandidate(snap.val()))
+          .catch(e => console.log("Error adding candidate:", e));
       }
     });
 
     // Escuchar candidates del sender
     db.ref(`${roomId}/candidates/sender`).on("child_added", snap => {
-      if (role === "viewer") {
-        pc.addIceCandidate(new RTCIceCandidate(snap.val()));
-        updateStatus("Candidate recibido del sender");
+      if (role === "viewer" && pc && pc.remoteDescription) {
+        pc.addIceCandidate(new RTCIceCandidate(snap.val()))
+          .catch(e => console.log("Error adding candidate:", e));
       }
     });
 
@@ -179,7 +237,11 @@
         }
 
         role = "sender";
+        createPeerConnection();
         updateStatus("Iniciando compartir pantalla...");
+        
+        // Limpiar datos anteriores
+        await db.ref(roomId).remove();
         
         const stream = await navigator.mediaDevices.getDisplayMedia({ 
           video: true, 
@@ -191,32 +253,39 @@
         
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
-        db.ref(`${roomId}/offer`).set({
+        
+        await db.ref(`${roomId}/offer`).set({
           type: offer.type,
           sdp: offer.sdp
         });
         
         updateStatus("Oferta creada. Esperando respuesta...");
 
-        // Escuchar respuesta
-        db.ref(`${roomId}/answer`).on("value", async snap => {
-          if (snap.exists()) {
-            const answer = new RTCSessionDescription(snap.val());
-            await pc.setRemoteDescription(answer);
-            updateStatus("Conexión establecida! Compartiendo pantalla...");
+        // Escuchar respuesta UNA SOLA VEZ
+        db.ref(`${roomId}/answer`).once("value", async snap => {
+          if (snap.exists() && pc.signalingState === "have-local-offer") {
+            try {
+              const answer = new RTCSessionDescription(snap.val());
+              await pc.setRemoteDescription(answer);
+              updateStatus("Conexión establecida! Compartiendo pantalla...");
+            } catch (error) {
+              console.error("Error setting remote description:", error);
+              updateStatus("Error en la conexión: " + error.message);
+            }
           }
         });
 
         // Manejar cuando se cierre la ventana de compartir
         stream.getVideoTracks()[0].onended = () => {
           updateStatus("Compartir pantalla terminado");
+          db.ref(roomId).remove();
         };
 
       } catch (error) {
         console.error("Error al compartir pantalla:", error);
         updateStatus("Error: " + error.message);
-        if (isMobile()) {
-          updateStatus("En móviles, usa 'Compartir Cámara' en su lugar.");
+        if (isiOS()) {
+          updateStatus("En iOS, usa el botón específico para iOS.");
         }
       }
     }
@@ -225,36 +294,32 @@
     async function startViewer() {
       try {
         role = "viewer";
+        createPeerConnection();
         updateStatus("Buscando pantalla compartida...");
         
-        db.ref(`${roomId}/offer`).once("value").then(async snap => {
-          const offer = snap.val();
-          if (!offer) {
-            updateStatus("No hay ofertas disponibles. Esperando...");
-            return;
+        // Escuchar ofertas
+        db.ref(`${roomId}/offer`).on("value", async snap => {
+          if (snap.exists() && (!pc.remoteDescription || pc.signalingState === "stable")) {
+            try {
+              const offer = snap.val();
+              updateStatus("Oferta encontrada. Creando respuesta...");
+              
+              await pc.setRemoteDescription(new RTCSessionDescription(offer));
+              const answer = await pc.createAnswer();
+              await pc.setLocalDescription(answer);
+              
+              await db.ref(`${roomId}/answer`).set({
+                type: answer.type,
+                sdp: answer.sdp
+              });
+              
+              updateStatus("Respuesta enviada. Conectando...");
+            } catch (error) {
+              console.error("Error processing offer:", error);
+              updateStatus("Error procesando oferta: " + error.message);
+            }
           }
-
-          await pc.setRemoteDescription(new RTCSessionDescription(offer));
-          const answer = await pc.createAnswer();
-          await pc.setLocalDescription(answer);
-          db.ref(`${roomId}/answer`).set({
-            type: answer.type,
-            sdp: answer.sdp
-          });
-          
-          updateStatus("Respuesta enviada. Conectando...");
         });
-
-        // Recibir stream
-        pc.ontrack = (event) => {
-          video.srcObject = event.streams[0];
-          updateStatus("Conexión establecida! Viendo pantalla compartida...");
-        };
-
-        // Manejar desconexión
-        pc.onconnectionstatechange = () => {
-          updateStatus("Estado de conexión: " + pc.connectionState);
-        };
 
       } catch (error) {
         console.error("Error al ver pantalla:", error);
