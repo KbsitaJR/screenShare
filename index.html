@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compartir Pantalla Móvil</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+
+        .video-container {
+            position: relative;
+            background: #000;
+            border-radius: 15px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            min-height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #screenVideo {
+            width: 100%;
+            height: auto;
+            border-radius: 15px;
+            display: none;
+        }
+
+        .placeholder {
+            color: #888;
+            font-size: 1.2em;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .screen-icon {
+            font-size: 3em;
+            opacity: 0.5;
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn.stop {
+            background: linear-gradient(45deg, #6c5ce7, #a29bfe);
+        }
+
+        .status {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 10px;
+            font-weight: 500;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.info {
+            background: #cce7ff;
+            color: #004085;
+            border: 1px solid #b8daff;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .share-section {
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 15px;
+            border: 2px dashed #ddd;
+        }
+
+        .share-url {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .share-url input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .copy-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .instructions {
+            margin-top: 20px;
+            text-align: left;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .instructions h3 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .instructions ul {
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .instructions li {
+            margin-bottom: 8px;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 20px;
+                margin: 10px;
+            }
+            
+            h1 {
+                font-size: 1.6em;
+            }
+            
+            .btn {
+                padding: 12px 25px;
+                font-size: 1em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📱 Compartir Pantalla</h1>
+        <p class="subtitle">Comparte tu pantalla desde el móvil</p>
+        
+        <div class="video-container">
+            <video id="screenVideo" autoplay muted playsinline></video>
+            <div class="placeholder" id="placeholder">
+                <div class="screen-icon">📱</div>
+                <div>Haz clic en "Iniciar Compartir" para comenzar</div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="btn" id="startBtn" onclick="startScreenShare()">
+                🚀 Iniciar Compartir
+            </button>
+            <button class="btn stop" id="stopBtn" onclick="stopScreenShare()" style="display: none;">
+                ⏹️ Detener
+            </button>
+        </div>
+
+        <div id="status" class="status" style="display: none;"></div>
+
+        <div class="share-section">
+            <h3>🔗 Compartir con otros</h3>
+            <p>Comparte esta URL para que otros puedan ver tu pantalla:</p>
+            <div class="share-url">
+                <input type="text" id="shareUrl" readonly>
+                <button class="copy-btn" onclick="copyUrl()">📋 Copiar</button>
+            </div>
+        </div>
+
+        <div class="instructions">
+            <h3>📋 Instrucciones</h3>
+            <ul>
+                <li><strong>Móvil:</strong> Abre esta página en tu navegador móvil</li>
+                <li><strong>Permisos:</strong> Permite el acceso a la pantalla cuando se solicite</li>
+                <li><strong>Compartir:</strong> Copia la URL y envíala a quien quieras que vea tu pantalla</li>
+                <li><strong>Compatibilidad:</strong> Funciona mejor en Chrome, Firefox y Safari</li>
+                <li><strong>Nota:</strong> Algunos navegadores móviles pueden tener limitaciones</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        let screenStream = null;
+        let isSharing = false;
+
+        // Configurar la URL compartible
+        document.getElementById('shareUrl').value = window.location.href;
+
+        async function startScreenShare() {
+            try {
+                showStatus('Solicitando acceso a la pantalla...', 'info');
+                
+                // Detectar si es móvil
+                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                
+                // Configuración para captura de pantalla
+                let constraints;
+                
+                if (isMobile) {
+                    // Para móviles, usar la cámara trasera como alternativa
+                    constraints = {
+                        video: {
+                            facingMode: 'environment',
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 },
+                            frameRate: { ideal: 15 }
+                        },
+                        audio: true
+                    };
+                } else {
+                    // Para escritorio, captura de pantalla
+                    constraints = {
+                        video: {
+                            mediaSource: 'screen',
+                            width: { ideal: 1920 },
+                            height: { ideal: 1080 },
+                            frameRate: { ideal: 15 }
+                        },
+                        audio: {
+                            echoCancellation: true,
+                            noiseSuppression: true,
+                            sampleRate: 44100
+                        }
+                    };
+                }
+
+                // Intentar getDisplayMedia primero (para escritorio)
+                if (!isMobile && navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
+                    try {
+                        screenStream = await navigator.mediaDevices.getDisplayMedia(constraints);
+                    } catch (error) {
+                        // Si falla, intentar con cámara
+                        showStatus('Captura de pantalla no disponible, usando cámara...', 'info');
+                        screenStream = await navigator.mediaDevices.getUserMedia({
+                            video: { facingMode: 'environment' },
+                            audio: true
+                        });
+                    }
+                } 
+                // Para móviles, usar directamente la cámara
+                else if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                    screenStream = await navigator.mediaDevices.getUserMedia(constraints);
+                    if (isMobile) {
+                        showStatus('Mostrando cámara (la captura de pantalla no está disponible en móviles)', 'info');
+                    }
+                } else {
+                    throw new Error('Tu navegador no soporta la captura de medios');
+                }
+
+                // Configurar el video
+                const videoElement = document.getElementById('screenVideo');
+                videoElement.srcObject = screenStream;
+                videoElement.style.display = 'block';
+                document.getElementById('placeholder').style.display = 'none';
+
+                // Actualizar controles
+                document.getElementById('startBtn').style.display = 'none';
+                document.getElementById('stopBtn').style.display = 'inline-block';
+                isSharing = true;
+
+                showStatus('¡Compartiendo pantalla exitosamente! 🎉', 'success');
+
+                // Detectar cuando se detiene la compartición
+                screenStream.getTracks().forEach(track => {
+                    track.onended = () => {
+                        if (isSharing) {
+                            stopScreenShare();
+                        }
+                    };
+                });
+
+            } catch (error) {
+                console.error('Error al iniciar la compartición:', error);
+                let errorMessage = 'Error al acceder a la pantalla: ';
+                
+                if (error.name === 'NotAllowedError') {
+                    errorMessage += 'Permisos denegados. Por favor, permite el acceso a la pantalla.';
+                } else if (error.name === 'NotSupportedError') {
+                    errorMessage += 'Tu navegador no soporta esta función. Prueba con Chrome, Firefox o Safari.';
+                } else if (error.name === 'AbortError') {
+                    errorMessage += 'Operación cancelada por el usuario.';
+                } else {
+                    errorMessage += error.message || 'Error desconocido';
+                }
+
+                showStatus(errorMessage, 'error');
+            }
+        }
+
+        function stopScreenShare() {
+            if (screenStream) {
+                screenStream.getTracks().forEach(track => track.stop());
+                screenStream = null;
+            }
+
+            // Restaurar interfaz
+            document.getElementById('screenVideo').style.display = 'none';
+            document.getElementById('screenVideo').srcObject = null;
+            document.getElementById('placeholder').style.display = 'flex';
+            document.getElementById('startBtn').style.display = 'inline-block';
+            document.getElementById('stopBtn').style.display = 'none';
+            isSharing = false;
+
+            showStatus('Compartición de pantalla detenida', 'info');
+        }
+
+        function copyUrl() {
+            const urlInput = document.getElementById('shareUrl');
+            urlInput.select();
+            urlInput.setSelectionRange(0, 99999);
+            
+            try {
+                document.execCommand('copy');
+                showStatus('¡URL copiada al portapapeles! 📋', 'success');
+            } catch (error) {
+                // Fallback para navegadores que no soportan execCommand
+                if (navigator.clipboard) {
+                    navigator.clipboard.writeText(urlInput.value).then(() => {
+                        showStatus('¡URL copiada al portapapeles! 📋', 'success');
+                    }).catch(() => {
+                        showStatus('No se pudo copiar automáticamente. Copia manualmente la URL.', 'error');
+                    });
+                } else {
+                    showStatus('No se pudo copiar automáticamente. Copia manualmente la URL.', 'error');
+                }
+            }
+        }
+
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+            statusDiv.style.display = 'block';
+            
+            // Ocultar después de 5 segundos para mensajes de éxito/info
+            if (type === 'success' || type === 'info') {
+                setTimeout(() => {
+                    statusDiv.style.display = 'none';
+                }, 5000);
+            }
+        }
+
+        // Verificar compatibilidad al cargar la página
+        window.addEventListener('load', () => {
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            
+            if (!navigator.mediaDevices) {
+                showStatus('⚠️ Tu navegador no soporta la captura de medios. Asegúrate de usar HTTPS.', 'error');
+                document.getElementById('startBtn').disabled = true;
+            } else if (isMobile && !navigator.mediaDevices.getDisplayMedia) {
+                showStatus('📱 En móviles se usará la cámara trasera para compartir contenido.', 'info');
+            } else if (!navigator.mediaDevices.getDisplayMedia) {
+                showStatus('ℹ️ La captura de pantalla puede no estar disponible. Se usará la cámara como alternativa.', 'info');
+            }
+            
+            // Verificar si estamos en HTTPS
+            if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+                showStatus('🔒 Esta aplicación requiere HTTPS para funcionar correctamente.', 'error');
+            }
+        });
+
+        // Manejar cambios de visibilidad para pausar/reanudar
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden' && isSharing) {
+                showStatus('Página en segundo plano - la compartición puede pausarse', 'info');
+            }
+        });
+    </script>
+</body>
+</html>

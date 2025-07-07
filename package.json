@@ -1,0 +1,14 @@
+{
+    "name": "screen-share-mobile",
+    "version": "1.0.0",
+    "description": "Aplicación web para compartir pantalla desde móvil",
+    "main": "index.html",
+    "scripts": {
+      "dev": "serve -s .",
+      "build": "echo 'No build needed'",
+      "start": "serve -s ."
+    },
+    "keywords": ["screen-share", "mobile", "webrtc"],
+    "author": "Tu nombre",
+    "license": "MIT"
+  }
